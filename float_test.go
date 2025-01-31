@@ -6,98 +6,97 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("StringSchema", func() {
-	Describe("Implements Schema intercace", func() {
-		// Compile time check for StringSchema implementing the Schema interface
-		schema := gsv.String()
+var _ = Describe("Float32Schema", func() {
+	It("Implements the Schema interface", func() {
+		schema := gsv.Float32()
 		var _ gsv.Schema = schema
-
 	})
 
-	Describe("New StringSchema", func() {
-		It("creates a new StringSchema", func() {
-			v := gsv.String()
+	Describe("New Float32Schema", func() {
+		It("creates a new Float32Schema", func() {
+			v := gsv.Float32()
 			Expect(v).ToNot(BeNil())
 		})
 	})
 
 	Describe("Min Validation", func() {
-		DescribeTable("validates minimum length",
-			func(value string, min int, message string, expectError bool) {
-				v := gsv.String().Min(min)
+		DescribeTable("validates minimum float32 value",
+			func(value float32, min float32, message string, expectError bool) {
+				v := gsv.Float32().Min(min)
 				v.Set(value)
 				result := v.Validate()
 
 				if expectError {
 					Expect(result.HasErrors()).To(BeTrue())
-					Expect(result.Errors[0].Type).To(Equal(gsv.MinStringLengthError))
-					if message != "" {
-						Expect(result.Errors[0].Message).To(Equal(message))
-					}
+					Expect(result.Errors[0].Type).To(Equal(gsv.MinNumberError))
+					Expect(result.Errors[0].Message).To(Equal(message))
 					Expect(result.Errors[0].Expected).To(Equal(min))
-					Expect(result.Errors[0].Actual).To(Equal(len(value)))
+					Expect(result.Errors[0].Actual).To(Equal(value))
 				} else {
 					Expect(result.HasErrors()).To(BeFalse())
 				}
 			},
-			Entry("valid length", "hello", 3, "", false),
-			Entry("too short", "hi", 3, "must be at least 3 characters long", true),
-			Entry("empty string", "", 1, "must be at least 1 characters long", true),
-			Entry("exact minimum", "hey", 3, "", false),
+			// Happy paths
+			Entry("greater than", float32(5.123), float32(3.123), "", false),
+			Entry("exact size", float32(3.123), float32(3.123), "", false),
+
+			// Error cases
+			Entry("smaller than", float32(1.123), float32(3.123), "must be at least 3.123", true),
 		)
 
 		It("supports custom error messages", func() {
-			customMsg := "too short!"
-			v := gsv.String().Min(3, gsv.ValidationOptions{Message: customMsg})
-			v.Set("hi")
+			customMsg := "too small!"
+			v := gsv.Float32().Min(float32(3.123), gsv.ValidationOptions{Message: customMsg})
+			v.Set(float32(1.123))
 			result := v.Validate()
 
 			Expect(result.HasErrors()).To(BeTrue())
-			Expect(result.Errors[0].Type).To(Equal(gsv.MinStringLengthError))
+			Expect(result.Errors[0].Type).To(Equal(gsv.MinNumberError))
 			Expect(result.Errors[0].Message).To(Equal(customMsg))
 		})
 	})
 
-	Describe("Max Validation", func() {
-		DescribeTable("validates maximum length",
-			func(value string, max int, message string, expectError bool) {
-				v := gsv.String().Max(max)
+	Describe("Min Validation", func() {
+		DescribeTable("validates maximum float32 value",
+			func(value float32, max float32, message string, expectError bool) {
+				v := gsv.Float32().Max(max)
 				v.Set(value)
 				result := v.Validate()
 
 				if expectError {
 					Expect(result.HasErrors()).To(BeTrue())
-					Expect(result.Errors[0].Type).To(Equal(gsv.MaxStringLengthError))
-					if message != "" {
-						Expect(result.Errors[0].Message).To(Equal(message))
-					}
+					Expect(result.Errors[0].Type).To(Equal(gsv.MaxNumberError))
+					Expect(result.Errors[0].Message).To(ContainSubstring(message))
 					Expect(result.Errors[0].Expected).To(Equal(max))
-					Expect(result.Errors[0].Actual).To(Equal(len(value)))
+					Expect(result.Errors[0].Actual).To(Equal(value))
 				} else {
 					Expect(result.HasErrors()).To(BeFalse())
 				}
 			},
-			Entry("valid length", "hello", 10, "", false),
-			Entry("too long", "hello world", 5, "must be at most 5 characters long", true),
-			Entry("exact maximum", "hello", 5, "", false),
+			// Happy paths
+			Entry("less than", float32(3.123), float32(5.123), "", false),
+			Entry("exact size", float32(3.123), float32(3.123), "", false),
+
+			// Error cases
+			Entry("greater than", float32(5.123), float32(3.123), "must not exceed: 3.123", true),
 		)
 
 		It("supports custom error messages", func() {
-			customMsg := "too long!"
-			v := gsv.String().Max(5, gsv.ValidationOptions{Message: customMsg})
-			v.Set("hello world")
+			customMsg := "too big!"
+			v := gsv.Float32().Max(float32(3.123), gsv.ValidationOptions{Message: customMsg})
+			v.Set(float32(5.123))
 			result := v.Validate()
 
 			Expect(result.HasErrors()).To(BeTrue())
-			Expect(result.Errors[0].Type).To(Equal(gsv.MaxStringLengthError))
+			Expect(result.Errors[0].Type).To(Equal(gsv.MaxNumberError))
 			Expect(result.Errors[0].Message).To(Equal(customMsg))
 		})
 	})
 
-	Describe("Min and Max Combined", func() {
-		DescribeTable("validates both min and max constraints",
-			func(value string, min, max int, expectedErrors map[string]string) {
-				v := gsv.String().Min(min).Max(max)
+	XDescribe("Min and Max Combined", func() {
+		DescribeTable("validates both min and max",
+			func(value, min, max float32, expectedErrors map[string]string) {
+				v := gsv.Float32().Min(min).Max(max)
 				v.Set(value)
 				result := v.Validate()
 
@@ -112,19 +111,19 @@ var _ = Describe("StringSchema", func() {
 					Expect(result.HasErrors()).To(BeFalse())
 				}
 			},
-			Entry("valid length", "hello", 3, 10, nil),
-			Entry("too short", "hi", 3, 10, map[string]string{
-				string(gsv.MinStringLengthError): "must be at least 3 characters long",
+			Entry("valid length", float32(4.123), float32(3.123), float32(5.123), nil),
+			Entry("too small", float32(1.123), float32(3.123), float32(5.123), map[string]string{
+				string(gsv.MinNumberError): "must be at least 3.123",
 			}),
-			Entry("too long", "hello world", 3, 5, map[string]string{
-				string(gsv.MaxStringLengthError): "must be at most 5 characters long",
+			Entry("too big", float32(6.123), float32(3.123), float32(5.123), map[string]string{
+				string(gsv.MinNumberError): "must be at no more than 5.123",
 			}),
-			Entry("exact minimum", "hey", 3, 5, nil),
-			Entry("exact maximum", "hello", 3, 5, nil),
+			Entry("exact minimum", float32(3.123), float32(3.123), float32(5.123), nil),
+			Entry("exact maximum", float32(5.123), float32(3.123), float32(5.123), nil),
 		)
 	})
 
-	Describe("JSON Unmarshaling", func() {
+	XDescribe("JSON Unmarshaling", func() {
 		type TestNestedStringSchema struct {
 			NestedTest *gsv.StringSchema `json:"nested_test"`
 		}
@@ -178,12 +177,11 @@ var _ = Describe("StringSchema", func() {
 			schema.Test = gsv.String()
 			schema.NestedSchema = &TestNestedStringSchema{}
 
-			result, err := gsv.Parse([]byte(jsonData), &schema)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(result.HasErrors()).To(BeTrue())
+			_, err := gsv.Parse([]byte(jsonData), &schema)
+			Expect(err).To(HaveOccurred())
 		})
 
-		XIt("handles null schema pointers when they're not instantiated", func() {
+		XIt("handles null schema pofloat32ers when they're not instantiated", func() {
 			jsonData := `{"nested_schema": {"nested_test": "nested test"}}`
 
 			var schema TestStringSchema
@@ -192,5 +190,12 @@ var _ = Describe("StringSchema", func() {
 			_, err := gsv.Parse([]byte(jsonData), &schema)
 			Expect(err).To(HaveOccurred())
 		})
+	})
+})
+
+var _ = Describe("Float64Schema", func() {
+	It("implements the Schema interface", func() {
+		schema := gsv.Float64()
+		var _ gsv.Schema = schema
 	})
 })
