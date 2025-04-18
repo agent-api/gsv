@@ -1,4 +1,4 @@
-package gsv_test
+package gsv_e2e_test
 
 import (
 	"github.com/agent-api/gsv"

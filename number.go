@@ -15,6 +15,8 @@ const (
 	InvalidNumberTypeError ValidationErrorType = "invalid_number_type"
 )
 
+type NumberValidatorFunc[T cmp.Ordered] func(T)
+
 // NumberSchema implements the Schema interface. It represents a generic "number"
 // with types implemented in int.go, uint.go, float.go, and rune.go.
 type NumberSchema[T cmp.Ordered] struct {
@@ -24,7 +26,7 @@ type NumberSchema[T cmp.Ordered] struct {
 
 	description *string
 
-	validators []func(T)
+	validators []NumberValidatorFunc[T]
 	isOptional bool
 	result     *ValidationResult
 }
@@ -32,7 +34,7 @@ type NumberSchema[T cmp.Ordered] struct {
 // Number creates a new number validator for a specific type
 func Number[T cmp.Ordered]() *NumberSchema[T] {
 	return &NumberSchema[T]{
-		validators: make([]func(T), 0),
+		validators: make([]NumberValidatorFunc[T], 0),
 		isOptional: false,
 	}
 }
@@ -101,12 +103,33 @@ func (n *NumberSchema[T]) Set(v T) *NumberSchema[T] {
 	return n
 }
 
+func (n *NumberSchema[T]) setValue(val interface{}) error {
+	num, ok := val.(T)
+	if !ok {
+		return fmt.Errorf("expected %T value, got %T", *new(T), val)
+	}
+	n.value = &num
+	return nil
+}
+
+// NumberSchema
 func (n *NumberSchema[T]) Value() (T, bool) {
-	if n.value == nil {
+	val, ok := n.getValue()
+	if !ok {
 		var zero T
 		return zero, false
 	}
+	numVal, ok := val.(T)
+	if !ok {
+		panic(fmt.Sprintf("NumberSchema: invalid internal value type %T, expected %T", val, *new(T)))
+	}
+	return numVal, true
+}
 
+func (n *NumberSchema[T]) getValue() (interface{}, bool) {
+	if n.value == nil {
+		return nil, false
+	}
 	return *n.value, true
 }
 
@@ -160,6 +183,39 @@ func (n *NumberSchema[T]) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (n *NumberSchema[T]) Clone() Schema {
+	// Create new instance
+	clone := &NumberSchema[T]{
+		isOptional: n.isOptional,
+		validators: make([]NumberValidatorFunc[T], len(n.validators)),
+	}
+	// Deep copy validators slice
+	copy(clone.validators, n.validators)
+
+	// Deep copy pointer fields
+	if n.min != nil {
+		min := *n.min
+		clone.min = &min
+	}
+	if n.max != nil {
+		max := *n.max
+		clone.max = &max
+	}
+	if n.value != nil {
+		val := *n.value
+		clone.value = &val
+	}
+	if n.description != nil {
+		desc := *n.description
+		clone.description = &desc
+	}
+
+	// Initialize new validation result
+	clone.result = &ValidationResult{}
+
+	return clone
 }
 
 func (n *NumberSchema[T]) CompileJSONSchema(schema *jsonschema.JSONSchema, jsonTag string) error {

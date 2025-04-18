@@ -143,6 +143,15 @@ func (v *StringSchema) Set(s string) *StringSchema {
 	return v
 }
 
+func (v *StringSchema) setValue(val interface{}) error {
+	s, ok := val.(string)
+	if !ok {
+		return fmt.Errorf("expected string value, got %T", val)
+	}
+	v.value = &s
+	return nil
+}
+
 // UnmarshalJSON implements json.Unmarshaler
 func (s *StringSchema) MarshalJSON() ([]byte, error) {
 	if s.value == nil {
@@ -226,12 +235,59 @@ func (s *StringSchema) CompileJSONSchema(schema *jsonschema.JSONSchema, jsonTag 
 	return nil
 }
 
-// Value returns the validated string value. This method returns ("", false) if
-// the string value is a null pointer due to it not being set
-func (sv *StringSchema) Value() (string, bool) {
-	if sv.value == nil {
-		return "", false
+// Clone implements Schema.Clone by creating a deep copy of the StringSchema
+func (s *StringSchema) Clone() Schema {
+	// Create new instance
+	clone := &StringSchema{
+		schemaType: s.schemaType,
+		isOptional: s.isOptional,
+		validators: make([]stringValidatorFunc, len(s.validators)),
 	}
 
-	return *sv.value, true
+	// Deep copy the validators slice
+	copy(clone.validators, s.validators)
+
+	// Deep copy pointer fields
+	if s.minLength != nil {
+		min := *s.minLength
+		clone.minLength = &min
+	}
+	if s.maxLength != nil {
+		max := *s.maxLength
+		clone.maxLength = &max
+	}
+	if s.description != nil {
+		desc := *s.description
+		clone.description = &desc
+	}
+	if s.value != nil {
+		val := *s.value
+		clone.value = &val
+	}
+
+	// Initialize a new validation result
+	clone.result = &ValidationResult{}
+
+	return clone
+}
+
+// Value returns the validated string value. This method returns ("", false) if
+// the string value is a null pointer due to it not being set
+func (s *StringSchema) Value() (string, bool) {
+	val, ok := s.getValue()
+	if !ok {
+		return "", false
+	}
+	strVal, ok := val.(string)
+	if !ok {
+		panic(fmt.Sprintf("StringSchema: invalid internal value type %T, expected string", val))
+	}
+	return strVal, true
+}
+
+func (s *StringSchema) getValue() (interface{}, bool) {
+	if s.value == nil {
+		return nil, false
+	}
+	return *s.value, true
 }

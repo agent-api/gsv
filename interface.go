@@ -25,4 +25,14 @@ type Schema interface {
 	// TODO IsNotOptional
 	// CompileJSONSchema for the JSON schema compiling
 	CompileJSONSchema(schema *jsonschema.JSONSchema, jsonTag string) error
+
+	// Clone creates a deep copy of the schema, including all validation rules
+	// and current value. The new schema instance will be completely independent
+	// from the original.
+	Clone() Schema
+
+	// Private method for internal use
+
+	setValue(interface{}) error
+	getValue() (interface{}, bool)
 }

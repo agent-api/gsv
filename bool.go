@@ -17,6 +17,8 @@ const (
 
 // BoolSchema implements the Schema interface for booleans.
 type BoolSchema struct {
+	// TODO need schema type
+
 	// validators are the registered functions to validate the string against
 	validators []boolValidatorFunc
 
@@ -52,6 +54,15 @@ func Bool() *BoolSchema {
 func (b *BoolSchema) Set(v bool) *BoolSchema {
 	b.value = &v
 	return b
+}
+
+func (b *BoolSchema) setValue(val interface{}) error {
+	s, ok := val.(bool)
+	if !ok {
+		return fmt.Errorf("expected bool value, got %T", val)
+	}
+	b.value = &s
+	return nil
 }
 
 func (b *BoolSchema) Description(val string) *BoolSchema {
@@ -127,10 +138,50 @@ func (b *BoolSchema) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Clone implements Schema.Clone by creating a deep copy of the StringSchema
+func (b *BoolSchema) Clone() Schema {
+	// Create new instance
+	clone := &BoolSchema{
+		isOptional: b.isOptional,
+		validators: make([]boolValidatorFunc, len(b.validators)),
+	}
+
+	// Deep copy the validators slice
+	copy(clone.validators, b.validators)
+
+	if b.description != nil {
+		desc := *b.description
+		clone.description = &desc
+	}
+
+	if b.value != nil {
+		val := *b.value
+		clone.value = &val
+	}
+
+	// Initialize a new validation result
+	clone.result = &ValidationResult{}
+
+	return clone
+}
+
 // Value returns the validated string value
 func (b *BoolSchema) Value() (bool, bool) {
-	if b.value == nil {
+	val, ok := b.getValue()
+	if !ok {
 		return false, false
+	}
+	boolVal, ok := val.(bool)
+	if !ok {
+		// who watches the watchers? - this should never happen
+		panic(fmt.Sprintf("BoolSchema: invalid internal value type %T, expected bool", val))
+	}
+	return boolVal, true
+}
+
+func (b *BoolSchema) getValue() (interface{}, bool) {
+	if b.value == nil {
+		return nil, false
 	}
 	return *b.value, true
 }
